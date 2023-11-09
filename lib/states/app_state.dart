@@ -51,7 +51,7 @@ class AppState with ChangeNotifier {
     notifyListeners();
   }
 
-  // ! ADD A MARKER ON THE MAO
+  // ! ADD A MARKER ON THE MAP
   void _addMarker(LatLng location, String address) {
     _markers.add(Marker(
         markerId: MarkerId(_lastPosition.toString()),
@@ -61,7 +61,7 @@ class AppState with ChangeNotifier {
     notifyListeners();
   }
 
-  // ! CREATE LAGLNG LIST
+  // ! CREATE LATLNG LIST
   List<LatLng> _convertToLatLng(List points) {
     List<LatLng> result = <LatLng>[];
     for (int i = 0; i < points.length; i++) {

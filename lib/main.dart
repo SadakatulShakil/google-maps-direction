@@ -5,8 +5,11 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:google_maps_webservice/directions.dart' as direction;
 import 'package:location/location.dart' as loc;
 import 'dart:math' show cos, sqrt, asin;
+
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(MyApp());
@@ -48,9 +51,10 @@ class _MapViewState extends State<MapView> {
   String _startAddress = '';
   String _destinationAddress = '';
   String? _placeDistance;
-
+  String? _estimatedTime ;
+  double destinationLatitude = 0.0;
+  double destinationLongitude = 0.0;
   Set<Marker> markers = {};
-
   late PolylinePoints polylinePoints;
   Map<PolylineId, Polyline> polylines = {};
   List<LatLng> polylineCoordinates = [];
@@ -146,13 +150,154 @@ class _MapViewState extends State<MapView> {
         _startAddress = _currentAddress;
       });
     } catch (e) {
-      print(e);
+      print('Error during geocoding: $e');
     }
   }
 
   // Method for calculating the distance between two places
+
+  // Future<bool> _calculateDistance() async {
+  //   try {
+  //         // Retrieving placemarks from addresses
+  //     print('Destination Address: $_destinationAddress');
+  //         List<Location> startPlacemark = await locationFromAddress(_startAddress);
+  //         List<Location> destinationPlacemark =
+  //         await locationFromAddress(_destinationAddress);
+  //
+  //         // Use the retrieved coordinates of the current position,
+  //         // instead of the address if the start position is user's
+  //         // current position, as it results in better accuracy.
+  //         double startLatitude = _startAddress == _currentAddress
+  //             ? _currentPosition.latitude
+  //             : startPlacemark[0].latitude;
+  //
+  //         double startLongitude = _startAddress == _currentAddress
+  //             ? _currentPosition.longitude
+  //             : startPlacemark[0].longitude;
+  //
+  //          destinationLatitude = destinationPlacemark[0].latitude;
+  //          destinationLongitude = destinationPlacemark[0].longitude;
+  //          print("ffff: "+ destinationLatitude.toString()+".........."+"gggg: "+destinationLongitude.toString());
+  //
+  //         String startCoordinatesString = '($startLatitude, $startLongitude)';
+  //         String destinationCoordinatesString =
+  //             '($destinationLatitude, $destinationLongitude)';
+  //
+  //         // Start Location Marker
+  //         Marker startMarker = Marker(
+  //           markerId: MarkerId(startCoordinatesString),
+  //           position: LatLng(startLatitude, startLongitude),
+  //           infoWindow: InfoWindow(
+  //             title: 'Start $startCoordinatesString',
+  //             snippet: _startAddress,
+  //           ),
+  //           icon: BitmapDescriptor.defaultMarker,
+  //         );
+  //
+  //         // Destination Location Marker
+  //         Marker destinationMarker = Marker(
+  //           markerId: MarkerId(destinationCoordinatesString),
+  //           position: LatLng(destinationLatitude, destinationLongitude),
+  //           infoWindow: InfoWindow(
+  //             title: 'Destination $destinationCoordinatesString',
+  //             snippet: _destinationAddress,
+  //           ),
+  //           icon: BitmapDescriptor.defaultMarker,
+  //         );
+  //
+  //         // Adding the markers to the list
+  //         markers.add(startMarker);
+  //         markers.add(destinationMarker);
+  //
+  //         print(
+  //           'START COORDINATES: ($startLatitude, $startLongitude)',
+  //         );
+  //         print(
+  //           'DESTINATION COORDINATES: ($destinationLatitude, $destinationLongitude)',
+  //         );
+  //
+  //         // Calculating to check that the position relative
+  //         // to the frame, and pan & zoom the camera accordingly.
+  //         double miny = (startLatitude <= destinationLatitude)
+  //             ? startLatitude
+  //             : destinationLatitude;
+  //         double minx = (startLongitude <= destinationLongitude)
+  //             ? startLongitude
+  //             : destinationLongitude;
+  //         double maxy = (startLatitude <= destinationLatitude)
+  //             ? destinationLatitude
+  //             : startLatitude;
+  //         double maxx = (startLongitude <= destinationLongitude)
+  //             ? destinationLongitude
+  //             : startLongitude;
+  //
+  //         double southWestLatitude = miny;
+  //         double southWestLongitude = minx;
+  //
+  //         double northEastLatitude = maxy;
+  //         double northEastLongitude = maxx;
+  //
+  //         // Accommodate the two locations within the
+  //         // camera view of the map
+  //         mapController.animateCamera(
+  //           CameraUpdate.newLatLngBounds(
+  //             LatLngBounds(
+  //               northeast: LatLng(northEastLatitude, northEastLongitude),
+  //               southwest: LatLng(southWestLatitude, southWestLongitude),
+  //             ),
+  //             100.0,
+  //           ),
+  //         );
+  //
+  //         await _createPolylines(startLatitude, startLongitude, destinationLatitude,
+  //             destinationLongitude);
+  //
+  //     direction.DirectionsResponse result = await directionsApi.directionsWithLocation(
+  //       direction.Location(lat: startLatitude, lng: startLongitude),
+  //       direction.Location(lat: destinationLatitude, lng: destinationLongitude),
+  //       travelMode: direction.TravelMode.driving,
+  //       trafficModel: direction.TrafficModel.bestGuess, // Use bestGuess for estimated traffic conditions
+  //     );
+  //
+  //     double totalDistance = 0.0;
+  //     num estimatedTimeInSeconds = result.routes[0].legs[0].duration.value;
+  //
+  //     if (polylineCoordinates.length >= 2) {
+  //       for (int i = 0; i < polylineCoordinates.length - 1; i++) {
+  //         totalDistance += _coordinateDistance(
+  //           polylineCoordinates[i].latitude,
+  //           polylineCoordinates[i].longitude,
+  //           polylineCoordinates[i + 1].latitude,
+  //           polylineCoordinates[i + 1].longitude,
+  //         );
+  //       }
+  //     }
+  //
+  //
+  //     const double averageSpeed = 12.0; // in meters per second
+  //     int estimatedTimeWithoutTraffic =
+  //     ((totalDistance * 1000) / averageSpeed).round();
+  //
+  //     // Format the duration
+  //     Duration duration = Duration(seconds: estimatedTimeInSeconds.toInt());
+  //
+  //     setState(() {
+  //       _placeDistance = totalDistance.toStringAsFixed(2);
+  //       _estimatedTime = formatDuration(duration);
+  //       print('DISTANCE: $_placeDistance km');
+  //     });
+  //
+  //     return true;
+  //   } catch (e) {
+  //     print('Error during geocoding: $e');
+  //   }
+  //   return false;
+  // }
+
+
   Future<bool> _calculateDistance() async {
     try {
+      final directionsApi = direction.GoogleMapsDirections(apiKey: 'AIzaSyCGA0CAQ2Z_LvRGT34jxE1Ob3wZJ-BcGUc');
       // Retrieving placemarks from addresses
       List<Location> startPlacemark = await locationFromAddress(_startAddress);
       List<Location> destinationPlacemark =
@@ -169,8 +314,8 @@ class _MapViewState extends State<MapView> {
           ? _currentPosition.longitude
           : startPlacemark[0].longitude;
 
-      double destinationLatitude = destinationPlacemark[0].latitude;
-      double destinationLongitude = destinationPlacemark[0].longitude;
+       destinationLatitude = destinationPlacemark[0].latitude;
+       destinationLongitude = destinationPlacemark[0].longitude;
 
       String startCoordinatesString = '($startLatitude, $startLongitude)';
       String destinationCoordinatesString =
@@ -242,18 +387,17 @@ class _MapViewState extends State<MapView> {
         ),
       );
 
-      // Calculating the distance between the start and the end positions
-      // with a straight path, without considering any route
-      // double distanceInMeters = await Geolocator.bearingBetween(
-      //   startLatitude,
-      //   startLongitude,
-      //   destinationLatitude,
-      //   destinationLongitude,
-      // );
-
       await _createPolylines(startLatitude, startLongitude, destinationLatitude,
           destinationLongitude);
 
+      direction.DirectionsResponse result = await directionsApi.directionsWithLocation(
+              direction.Location(lat: startLatitude, lng: startLongitude),
+              direction.Location(lat: destinationLatitude, lng: destinationLongitude),
+              travelMode: direction.TravelMode.driving,
+              trafficModel: direction.TrafficModel.bestGuess, // Use bestGuess for estimated traffic conditions
+            );
+      //int estimatedTimeInSeconds = result.routes[0].legs[0].duration.value.toInt();
+      print("kkkk: "+ result.status);
       double totalDistance = 0.0;
 
       // Calculating the total distance by adding the distance
@@ -266,10 +410,19 @@ class _MapViewState extends State<MapView> {
           polylineCoordinates[i + 1].longitude,
         );
       }
+      const double averageSpeed = 15.0; // in meters per second
+      int estimatedTimeWithoutTraffic =
+         ((totalDistance * 1000) / averageSpeed).round();
+
+      // Format the duration
+      Duration duration = Duration(seconds: estimatedTimeWithoutTraffic);
 
       setState(() {
         _placeDistance = totalDistance.toStringAsFixed(2);
+        _estimatedTime = formatDuration(duration);
         print('DISTANCE: $_placeDistance km');
+        //print('timeWithTraffic: $estimatedTimeInSeconds');
+        print('timeWithOutTraffic: $estimatedTimeWithoutTraffic');
       });
 
       return true;
@@ -277,6 +430,14 @@ class _MapViewState extends State<MapView> {
       print(e);
     }
     return false;
+  }
+
+  // Helper method to format duration as HH:MM:SS
+  String formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    return '${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds';
   }
 
   // Formula for calculating distance between two coordinates
@@ -468,6 +629,16 @@ class _MapViewState extends State<MapView> {
                               ),
                             ),
                           ),
+                          Visibility(
+                            visible: _placeDistance == null ? false : true,
+                            child: Text(
+                              'Time to complete: $_estimatedTime',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                           SizedBox(height: 5),
                           ElevatedButton(
                             onPressed: (_startAddress != '' &&
@@ -643,16 +814,45 @@ class _MapViewState extends State<MapView> {
     );
   }
 
-  Future<void> _getLiveLocation() async{
-  _locationSubscription = location.onLocationChanged.handleError((onError){
-    print(onError);
-    _locationSubscription?.cancel();
-    setState(() {
-      _locationSubscription = null;
+// Modify the _getLiveLocation method
+  Future<void> _getLiveLocation() async {
+    // Launch navigation
+    launchNavigation();
+
+    _locationSubscription = location.onLocationChanged.handleError((onError) {
+      print(onError);
+      _locationSubscription?.cancel();
+      setState(() {
+        _locationSubscription = null;
+      });
+    }).listen((loc.LocationData currentLocation) async {
+      print(
+          'live update ==>' + currentLocation.latitude.toString() + ' || ' + currentLocation.longitude.toString());
+
+      // Check if the destination is reached
+      double distance = _coordinateDistance(
+        currentLocation.latitude,
+        currentLocation.longitude,
+        destinationLatitude,
+        destinationLongitude,
+      );
+
+      if (distance < 0.1) {
+        // Stop location updates
+        _cancelLiveLocation();
+        Navigator.of(context).pop();
+      }
     });
-  }).listen((loc.LocationData currentLocation) async{
-    print('live update ==>'+ currentLocation.latitude.toString()+' || '+ currentLocation.longitude.toString());
-  });
+  }
+
+// Method to launch navigation
+  void launchNavigation() async {
+    final url = 'google.navigation:q=$_destinationAddress';
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url));
+    } else {
+      throw 'Could not launch $url';
+    }
   }
   Future<void> _cancelLiveLocation() async{
       _locationSubscription?.cancel();
