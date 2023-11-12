@@ -34,22 +34,32 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
     getSuggesions(_searchController.text);
   }
 
-  void getSuggesions(String input)async{
-    String ApiKey = 'AIzaSyCGA0CAQ2Z_LvRGT34jxE1Ob3wZJ-BcGUc';
+  void getSuggesions(String input) async {
+    String apiKey = 'AIzaSyCGA0CAQ2Z_LvRGT34jxE1Ob3wZJ-BcGUc';
     String baseUrl = 'https://maps.googleapis.com/maps/api/place/autocomplete/json';
-    String request =  '$baseUrl?input=$input&key=$ApiKey&sessiontoken=$sessionId';
+    String request = '$baseUrl?input=$input&key=$apiKey&sessiontoken=$sessionId';
 
-    var response = await http.get(Uri.parse(request));
+    try {
+      var response = await http.get(Uri.parse(request));
 
-    print(response.body.toString());
-    if(response.statusCode == 200){
-      setState(() {
-        placesList = jsonDecode(response.body.toString()) ['predictions'];
-      });
-    }else{
-      throw Exception('Failed to load!');
+      if (response.statusCode == 200) {
+        Map<String, dynamic> responseData = jsonDecode(response.body);
+
+        if (responseData.containsKey('predictions')) {
+          setState(() {
+            placesList = responseData['predictions'];
+          });
+        } else {
+          print('Error: Predictions key not found in response');
+        }
+      } else {
+        print('Failed to load: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Exception during API request: $e');
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -63,10 +73,21 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
             child: TextField(
               controller: _searchController,
               onChanged: (value) {
-                // You can perform real-time search suggestions here
+                onChanged();
               },
               decoration: InputDecoration(
                 hintText: 'Search for a place...',
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                  icon: Icon(Icons.cancel),
+                  onPressed: () {
+                    setState(() {
+                      _searchController.clear();
+                      placesList.clear();
+                    });
+                  },
+                )
+                    : null,
               ),
             ),
           ),
@@ -101,4 +122,12 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
       return [];
     }
   }
+
+  @override
+  void dispose() {
+    // Dispose resources here
+    super.dispose();
+  }
 }
+
+
