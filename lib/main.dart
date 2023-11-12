@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:gms_project/screens/place_search_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_webservice/directions.dart' as direction;
 import 'package:location/location.dart' as loc;
@@ -52,8 +53,11 @@ class _MapViewState extends State<MapView> {
   String _destinationAddress = '';
   String? _placeDistance;
   String? _estimatedTime ;
+  DateTime? startTime;
+  DateTime? stopTime;
   double destinationLatitude = 0.0;
   double destinationLongitude = 0.0;
+  double totalDistanceCovered = 0.0;
   Set<Marker> markers = {};
   late PolylinePoints polylinePoints;
   Map<PolylineId, Polyline> polylines = {};
@@ -80,6 +84,11 @@ class _MapViewState extends State<MapView> {
         },
         controller: controller,
         focusNode: focusNode,
+        onTap: () {
+          if (focusNode == desrinationAddressFocusNode) {
+            _openSearchScreen();
+          }
+        },
         decoration: new InputDecoration(
           prefixIcon: prefixIcon,
           suffixIcon: suffixIcon,
@@ -109,6 +118,20 @@ class _MapViewState extends State<MapView> {
         ),
       ),
     );
+  }
+
+  void _openSearchScreen()async{
+    String? selectedPlace = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => PlaceSearchScreen()),
+    );
+
+    if (selectedPlace != null) {
+      setState(() {
+        destinationAddressController.text = selectedPlace ?? '';
+        _destinationAddress = destinationAddressController.text;
+      });
+    }
   }
 
   // Method for retrieving the current location
@@ -297,7 +320,7 @@ class _MapViewState extends State<MapView> {
 
   Future<bool> _calculateDistance() async {
     try {
-      final directionsApi = direction.GoogleMapsDirections(apiKey: 'AIzaSyCGA0CAQ2Z_LvRGT34jxE1Ob3wZJ-BcGUc');
+      direction.GoogleMapsDirections directionsApi = direction.GoogleMapsDirections(apiKey: 'AIzaSyCGA0CAQ2Z_LvRGT34jxE1Ob3wZJ-BcGUc');
       // Retrieving placemarks from addresses
       List<Location> startPlacemark = await locationFromAddress(_startAddress);
       List<Location> destinationPlacemark =
@@ -391,11 +414,12 @@ class _MapViewState extends State<MapView> {
           destinationLongitude);
 
       direction.DirectionsResponse result = await directionsApi.directionsWithLocation(
-              direction.Location(lat: startLatitude, lng: startLongitude),
-              direction.Location(lat: destinationLatitude, lng: destinationLongitude),
-              travelMode: direction.TravelMode.driving,
-              trafficModel: direction.TrafficModel.bestGuess, // Use bestGuess for estimated traffic conditions
-            );
+        direction.Location(lat: startLatitude, lng: startLongitude),
+        direction.Location(lat: destinationLatitude, lng: destinationLongitude),
+        travelMode: direction.TravelMode.driving,
+        trafficModel: direction.TrafficModel.bestGuess,
+      );
+
       //int estimatedTimeInSeconds = result.routes[0].legs[0].duration.value.toInt();
       print("kkkk: "+ result.status);
       double totalDistance = 0.0;
@@ -410,6 +434,11 @@ class _MapViewState extends State<MapView> {
           polylineCoordinates[i + 1].longitude,
         );
       }
+      totalDistanceCovered += totalDistance;
+
+      // Log the total distance covered
+      print('Total Distance Covered: ${totalDistanceCovered.toStringAsFixed(2)} km');
+
       const double averageSpeed = 15.0; // in meters per second
       int estimatedTimeWithoutTraffic =
          ((totalDistance * 1000) / averageSpeed).round();
@@ -615,7 +644,7 @@ class _MapViewState extends State<MapView> {
                               width: width,
                               locationCallback: (String value) {
                                 setState(() {
-                                  _destinationAddress = value;
+                                  _destinationAddress = destinationAddressController.text;
                                 });
                               }),
                           SizedBox(height: 10),
@@ -816,6 +845,10 @@ class _MapViewState extends State<MapView> {
 
 // Modify the _getLiveLocation method
   Future<void> _getLiveLocation() async {
+    // Log start time when "Start Journey" button is pressed
+    setState(() {
+      startTime = DateTime.now();
+    });
     // Launch navigation
     launchNavigation();
 
@@ -840,6 +873,15 @@ class _MapViewState extends State<MapView> {
       if (distance < 0.1) {
         // Stop location updates
         _cancelLiveLocation();
+        // Log stop time when "Stop Journey" button is pressed
+        setState(() {
+          stopTime = DateTime.now();
+        });
+        // Calculate duration
+        if (startTime != null && stopTime != null) {
+          Duration duration = stopTime!.difference(startTime!);
+          print('Journey Duration: ${formatDuration(duration)}');
+        }
         Navigator.of(context).pop();
       }
     });
@@ -857,6 +899,15 @@ class _MapViewState extends State<MapView> {
   Future<void> _cancelLiveLocation() async{
       _locationSubscription?.cancel();
       setState(() {
+        //_calculateDistance();
+        setState(() {
+          stopTime = DateTime.now();
+        });
+        // Calculate duration
+        if (startTime != null && stopTime != null) {
+          Duration duration = stopTime!.difference(startTime!);
+          print('Journey Duration: ${formatDuration(duration)}');
+        }
         _locationSubscription = null;
       });
   }
